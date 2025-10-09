@@ -4,6 +4,7 @@ interface ParseResult {
   allParticipants: Participant[];
   uniqueParticipants: Participant[];
   duplicates: Map<string, number>;
+  header?: string[];
 }
 
 interface LocationParseResult {
@@ -27,6 +28,7 @@ export const parseFile = (file: File): Promise<ParseResult> => {
 
         const fileName = file.name.toLowerCase();
         let participants: Participant[] = [];
+        let header: string[] | undefined;
 
         if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
           const lines = content.split(/\r\n|\n/).filter(line => line.trim() !== '');
@@ -34,27 +36,28 @@ export const parseFile = (file: File): Promise<ParseResult> => {
             resolve({ allParticipants: [], uniqueParticipants: [], duplicates: new Map() });
             return;
           }
-          const header = lines[0].toLowerCase().split(',');
-          const nameIndex = header.findIndex(h => h.includes('name') || h.includes('nombre'));
-          const locationIndex = header.findIndex(h => h.includes('location') || h.includes('ciudad') || h.includes('ubicacion'));
-
-          const dataLines = nameIndex !== -1 ? lines.slice(1) : lines;
           
-          if (nameIndex === -1 && lines.length > 0) {
-              participants = dataLines.map((line, index) => ({
-                id: `${Date.now()}-${index}`,
-                name: line.split(',')[0].trim(), // Assume name is the first column if no header
-              }));
-          } else {
-            participants = dataLines.map((line, index) => {
-              const columns = line.split(',');
-              return {
-                id: `${Date.now()}-${index}`,
-                name: columns[nameIndex]?.trim() || `Participante ${index + 1}`,
-                location: columns[locationIndex]?.trim(),
-              };
-            });
+          let dataLines = lines;
+          const potentialHeader = lines[0].toLowerCase().split(',');
+          // Heuristic to check for a header row
+          if (lines.length > 1 && potentialHeader.some(h => h.includes('name') || h.includes('nombre') || h.includes('id') || h.includes('dni'))) {
+            header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+            dataLines = lines.slice(1);
           }
+
+          participants = dataLines.map((line, index) => {
+            const columns = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+            const name = columns.length > 1 
+              ? `${columns[0]} - ${columns[1]}`.trim()
+              : (columns[0] || `Participante ${index + 1}`).trim();
+            
+            return {
+              id: `${Date.now()}-${index}`,
+              name: name,
+              csvData: columns,
+            };
+          });
+
         } else if (fileName.endsWith('.json')) {
           const data = JSON.parse(content);
           if (Array.isArray(data)) {
@@ -94,7 +97,7 @@ export const parseFile = (file: File): Promise<ParseResult> => {
             }
         }
 
-        resolve({ allParticipants: participants, uniqueParticipants, duplicates });
+        resolve({ allParticipants: participants, uniqueParticipants, duplicates, header });
       } catch (error) {
         reject(new Error('Error al analizar el archivo. Por favor, revisa el formato del archivo.'));
       }
@@ -185,6 +188,8 @@ export const parseLocationFile = (file: File): Promise<LocationParseResult> => {
     reader.onerror = () => {
       reject(new Error('No se pudo leer el archivo de ubicaciones.'));
     };
+
+
 
     reader.readAsText(file);
   });

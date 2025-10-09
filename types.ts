@@ -3,6 +3,7 @@ export interface Participant {
   id: string;
   name: string;
   location?: string;
+  csvData?: string[]; // For CSV imports, store all columns
 }
 
 export type Winner = Participant;
@@ -25,4 +26,5 @@ export interface Raffle {
   locations: Location[];
   awards: Award[];
   waitlist?: Participant[];
+  participantCsvHeader?: string[];
 }

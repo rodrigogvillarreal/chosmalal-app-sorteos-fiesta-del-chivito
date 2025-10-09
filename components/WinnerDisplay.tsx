@@ -14,6 +14,7 @@ interface WinnerDisplayProps {
   allAvailableLocations: Location[];
   raffleTitle: string;
   raffleDate?: string;
+  participantCsvHeader: string[] | null;
 }
 
 const NameCycler: React.FC<{ participants: Participant[] }> = ({ participants }) => {
@@ -45,7 +46,8 @@ export const WinnerDisplay: React.FC<WinnerDisplayProps> = ({
   locationsForCurrentDraw,
   allAvailableLocations,
   raffleTitle,
-  raffleDate
+  raffleDate,
+  participantCsvHeader
 }) => {
   const [showConfetti, setShowConfetti] = useState(false);
   const prevAwardsCount = useRef(awards.length);
@@ -70,10 +72,30 @@ export const WinnerDisplay: React.FC<WinnerDisplayProps> = ({
   const downloadResults = () => {
     const titleLine = `Título del Sorteo: ${raffleTitle}\n`;
     const dateLine = `Fecha: ${raffleDate ? new Date(raffleDate).toLocaleString('es-ES') : new Date().toLocaleString('es-ES')}\n\n`;
-    const header = "Ubicación,Ganador,Ubicación del Ganador\n";
-    const csvContent = awards.map(a => `"${a.location.name}","${a.winner.name}","${a.winner.location || ''}"`).join("\n");
     
-    const blob = new Blob([titleLine, dateLine, header, csvContent], { type: 'text/csv;charset=utf-8;' });
+    let header: string;
+    let csvContent: string;
+
+    const firstWinner = awards[0]?.winner;
+    const isCsvExport = !!firstWinner?.csvData?.length;
+
+    if (isCsvExport) {
+        const participantHeaders = participantCsvHeader
+            ? participantCsvHeader.map(h => `"${h.replace(/"/g, '""')}"`).join(',')
+            : Array.from({ length: firstWinner.csvData.length }, (_, i) => `Dato Participante ${i + 1}`).join(',');
+        
+        header = `Ubicación,${participantHeaders}\n`;
+
+        csvContent = awards.map(a => {
+            const winnerData = (a.winner.csvData || []).map(d => `"${(d || '').replace(/"/g, '""')}"`).join(',');
+            return `"${a.location.name.replace(/"/g, '""')}",${winnerData}`;
+        }).join("\n");
+    } else {
+        header = "Ubicación,Ganador,Ubicación del Ganador\n";
+        csvContent = awards.map(a => `"${a.location.name}","${a.winner.name}","${a.winner.location || ''}"`).join("\n");
+    }
+    
+    const blob = new Blob([`\uFEFF${titleLine}`, dateLine, header, csvContent], { type: 'text/csv;charset=utf-8;' });
     
     const link = document.createElement("a");
     if (link.download !== undefined) {
@@ -93,12 +115,32 @@ export const WinnerDisplay: React.FC<WinnerDisplayProps> = ({
 
     const titleLine = `Suplentes para el Sorteo: ${raffleTitle}\n`;
     const dateLine = `Fecha: ${raffleDate ? new Date(raffleDate).toLocaleString('es-ES') : new Date().toLocaleString('es-ES')}\n\n`;
-    const header = "Orden,Nombre,Ubicación del Participante\n";
-    const csvContent = waitlist
-      .map((p, index) => `${index + 1},"${p.name}","${p.location || ''}"`)
-      .join("\n");
+    
+    let header: string;
+    let csvContent: string;
+    
+    const firstWaitlisted = waitlist[0];
+    const isCsvExport = !!firstWaitlisted?.csvData?.length;
+
+    if (isCsvExport) {
+        const participantHeaders = participantCsvHeader
+            ? participantCsvHeader.map(h => `"${h.replace(/"/g, '""')}"`).join(',')
+            : Array.from({ length: firstWaitlisted.csvData.length }, (_, i) => `Dato Participante ${i + 1}`).join(',');
+
+        header = `Orden,${participantHeaders}\n`;
+
+        csvContent = waitlist.map((p, index) => {
+            const participantData = (p.csvData || []).map(d => `"${(d || '').replace(/"/g, '""')}"`).join(',');
+            return `${index + 1},${participantData}`;
+        }).join("\n");
+    } else {
+        header = "Orden,Nombre,Ubicación del Participante\n";
+        csvContent = waitlist
+          .map((p, index) => `${index + 1},"${p.name}","${p.location || ''}"`)
+          .join("\n");
+    }
       
-    const blob = new Blob([titleLine, dateLine, header, csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${titleLine}`, dateLine, header, csvContent], { type: 'text/csv;charset=utf-8;' });
     
     const link = document.createElement("a");
     if (link.download !== undefined) {

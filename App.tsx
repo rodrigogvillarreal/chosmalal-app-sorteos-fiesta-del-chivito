@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarningInfo | null>(null);
   const [locationDuplicateWarning, setLocationDuplicateWarning] = useState<LocationDuplicateWarningInfo | null>(null);
   const [locationsForDraw, setLocationsForDraw] = useState<Location[]>([]);
+  const [participantCsvHeader, setParticipantCsvHeader] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (currentRaffle) {
@@ -50,6 +51,7 @@ const App: React.FC = () => {
       setAwards(currentRaffle.awards);
       setNumberOfWinners(currentRaffle.awards.length > 0 ? currentRaffle.awards.length : 1);
       setWaitlist(currentRaffle.waitlist || []);
+      setParticipantCsvHeader(currentRaffle.participantCsvHeader || null);
       setIsRaffling(false);
       setParticipantFile(null);
       setLocationFile(null);
@@ -63,6 +65,7 @@ const App: React.FC = () => {
     setParticipants([]);
     setError('');
     setDuplicateWarning(null);
+    setParticipantCsvHeader(null);
 
     if (!selectedFile) {
       return;
@@ -70,6 +73,9 @@ const App: React.FC = () => {
 
     try {
       const result = await parseFile(selectedFile);
+      if(result.header) {
+        setParticipantCsvHeader(result.header);
+      }
       if (result.allParticipants.length === 0) {
         setError('El archivo está vacío o el formato es incorrecto. Cada participante debe estar en una nueva línea.');
       } else if (result.duplicates.size > 0) {
@@ -202,12 +208,13 @@ const App: React.FC = () => {
             locations: locations,
             awards: finalAwards,
             waitlist: remainingParticipants,
+            participantCsvHeader: participantCsvHeader || undefined,
           };
           saveRaffle(newRaffle);
         }
       }, (index + 1) * 3000);
     });
-  }, [participants, locations, numberOfWinners, raffleTitle, saveRaffle, currentRaffle]);
+  }, [participants, locations, numberOfWinners, raffleTitle, saveRaffle, currentRaffle, participantCsvHeader]);
 
   const resetForNewRaffle = useCallback(() => {
     setCurrentRaffle(null);
@@ -224,6 +231,7 @@ const App: React.FC = () => {
     setDuplicateWarning(null);
     setLocationDuplicateWarning(null);
     setLocationsForDraw([]);
+    setParticipantCsvHeader(null);
   }, [setCurrentRaffle]);
 
   const handleLoadRaffle = useCallback((raffleId: string) => {
@@ -289,6 +297,7 @@ const App: React.FC = () => {
               allAvailableLocations={locations}
               raffleTitle={raffleTitle}
               raffleDate={currentRaffle?.date}
+              participantCsvHeader={participantCsvHeader}
             />
           </main>
         </div>
